@@ -25,8 +25,8 @@ module Anemone
 
     def self.MongoDB(mongo_db = nil, collection_name = 'pages')
       require 'anemone/storage/mongodb'
-      mongo_db ||= Mongo::Connection.new.db('anemone')
-      raise "First argument must be an instance of Mongo::DB" unless mongo_db.is_a?(Mongo::DB)
+      mongo_db ||= Mongo::Client.new(['127.0.0.1:27017'], database: collection_name)
+      raise "First argument must be an instance of Mongo::Client" unless mongo_db.is_a?(Mongo::Client)
       self::MongoDB.new(mongo_db, collection_name)
     end
 
@@ -34,7 +34,7 @@ module Anemone
       require 'anemone/storage/redis'
       self::Redis.new(opts)
     end
-    
+
     def self.SQLite3(file = 'anemone.db')
       require 'anemone/storage/sqlite3'
       self::SQLite3.new(file)

@@ -7,19 +7,21 @@ end
 
 module Anemone
   module Storage
-    class MongoDB 
+    class MongoDB
 
       BINARY_FIELDS = %w(body headers data)
 
       def initialize(mongo_db, collection_name)
-        @db = mongo_db
-        @collection = @db[collection_name]
-        @collection.remove
-        @collection.create_index 'url'
+        @client = mongo_db
+        @db = @client.database
+        @collection = @client[collection_name]
+        @collection.create unless @db.collection_names.include?(@collection.name)
+        @collection.delete_many
+        @collection.indexes.create_one(url: 1)
       end
 
       def [](url)
-        if value = @collection.find_one('url' => url.to_s)
+        if value = @collection.find(url: url.to_s).first
           load_page(value)
         end
       end
@@ -29,16 +31,12 @@ module Anemone
         BINARY_FIELDS.each do |field|
           hash[field] = BSON::Binary.new(hash[field]) unless hash[field].nil?
         end
-        @collection.update(
-          {'url' => page.url.to_s},
-          hash,
-          :upsert => true
-        )
+        @collection.update_one({url: page.url.to_s}, hash, :upsert => true)
       end
 
       def delete(url)
         page = self[url]
-        @collection.remove('url' => url.to_s)
+        @collection.delete_many(url: url.to_s)
         page
       end
 
@@ -46,7 +44,7 @@ module Anemone
         @collection.find do |cursor|
           cursor.each do |doc|
             page = load_page(doc)
-            yield page.url.to_s, page 
+            yield page.url.to_s, page
           end
         end
       end
@@ -67,11 +65,11 @@ module Anemone
       end
 
       def has_key?(url)
-        !!@collection.find_one('url' => url.to_s)
+        !!@collection.find(url: url.to_s).first
       end
 
       def close
-        @db.connection.close
+        @client.close
       end
 
       private
